@@ -105,11 +105,11 @@ function centroid(_::IdealPhotodetector, _::NoSignal, _::typeof(1.0u"s"))
 end
 
 """
-    centroid(ideal_photodetector, optical_signal)
+    centroid(ideal_photodetector, optical_signal, exposure_time)
 
 Centroid of the optical signal read by the ideal photodetector.
 """
-function centroid(pd::IdealPhotodetector, os::OpticalSignal, exposure_time::typeof(1.0u"s"))
+function centroid(pd::IdealPhotodetector, os::OpticalSignal, _::typeof(1.0u"s"))
     signal = []
     for feature in os.pattern
         s = intersection(feature, pd.geometry).geom

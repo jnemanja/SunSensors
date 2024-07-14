@@ -16,6 +16,7 @@ import Base.zero
 
 include("sensor/light_source.jl")
 
+export LightSource
 export RayAngles
 export RayVector
 export direction_vector
@@ -57,5 +58,6 @@ export ProfileSensor
 export PsdSensor
 export OpticalSignal
 export read
+export size
 
 end

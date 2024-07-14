@@ -34,7 +34,7 @@ end
 function projectray(point::Point, ray::Point)
     vp = to(point)
     vr = to(ray)
-    p = Point((vp[1:2] .- (vp[3] / vr[3]) * vr[1:2])...)
+    p = Point((vp[1:2] .+ (vp[3] / vr[3]) * vr[1:2])...)
     return p
 end
 

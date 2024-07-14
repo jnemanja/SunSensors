@@ -67,13 +67,13 @@ function read(
     sensor_size = pixelsize .* sensor.resolution
     sensor_bottomleft = sensor_size ./ -2
     sensor_topright = sensor_size ./ 2
+    sensor_box = Box(Point(sensor_bottomleft...), Point(sensor_topright...))
 
     if typeof(os) !== NoSignal
         # For each feature placement, find the pixels it might affect.
         @inbounds for (pi, p) in enumerate(os.pattern)
             bbox = Meshes.boundingbox(p)
 
-            sensor_box = Box(Point(sensor_bottomleft...), Point(sensor_topright...))
             if !intersects(p, sensor_box)
                 continue
             end
@@ -109,8 +109,8 @@ function read(
     # and read that pixel.
     @inbounds for y in 1:sensor.resolution[2]
         @inbounds for x in 1:sensor.resolution[1]
-            yy = -(sensor.resolution[2] / 2 - y + 0.5) * pixelsize[2]
-            xx = -(sensor.resolution[1] / 2 - x + 0.5) * pixelsize[1]
+            yy = (y - 0.5 - sensor.resolution[2] / 2) * pixelsize[2]
+            xx = (x - 0.5 - sensor.resolution[1] / 2) * pixelsize[1]
 
             fs = []
             for i in 1:(pixel_features[x, y].count)
@@ -140,6 +140,11 @@ function read(s::CcdSensor, os::OpticalSignal, t::typeof(1.0u"s"))
     # Assume the CCD sensor pixels are sufficiently smaller than the optical sgianl featurs and
     # four are to be read by a pixel at maximum.
     return read(s, os, t, 4)
+end
+
+function size(s::CcdSensor)
+    bbox = boundingbox(s.pixel.geometry)
+    return (bbox.max - bbox.min) .* s.resolution
 end
 
 """
@@ -211,6 +216,14 @@ function read(sensor::ProfileSensor, os::OpticalSignal, exposure_time::typeof(1.
     return hcat(out_horizontal', out_vertical)
 end
 
+function size(s::ProfileSensor)
+    v_bbox = boundingbox(s.vertical_pixel.geometry)
+    h_bbox = boundingbox(s.horizontal_pixel.geometry)
+    w = max((h_bbox.max - h_bbox.min)...)
+    h = max((v_bbox.max - v_bbox.min)...)
+    return (w, h)
+end
+
 """
     PsdSensor(photodetector, transfer_coefficinets)
 
@@ -251,4 +264,9 @@ function read(sensor::PsdSensor, os::OpticalSignal, exposure_time::typeof(1.0u"s
     charges = outs ./ sum(outs) * c
 
     return charges
+end
+
+function size(s::PsdSensor)
+    bbox = boundingbox(s.photodetector.geometry)
+    return (bbox.max - bbox.min)
 end
