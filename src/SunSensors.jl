@@ -10,6 +10,7 @@ using Rotations: Rotation
 @reexport using Rotations: RotY
 @reexport using Rotations: RotZ
 using StaticArrays: SVector
+using Statistics
 @reexport using Unitful
 
 import Base.zero
@@ -59,5 +60,9 @@ export PsdSensor
 export OpticalSignal
 export read
 export size
+
+include("determination/utils.jl")
+
+export measure_accuracy_precision
 
 end

@@ -3,6 +3,7 @@
 # the sensors datasheet:
 # https://www.hamamatsu.com/content/dam/hamamatsu-photonics/sites/documents/99_SALES_LIBRARY/ssd/s5990-01_etc_kpsd1010e.pdf
 
+using Statistics
 using SunSensors
 using Plots
 
@@ -49,14 +50,20 @@ println("Dark currents from datasheet S5990 0.5 nA, S5991 1 nA")
 println("Dark current S5990 $dark_current_s5990, S5991 $dark_current_s5991")
 
 ## Resolution
-ls_photocurrent_1uA = RayAngles(0.0u"°", 0.0u"°", 75.0u"W/m^2")
-signal = OpticalSignal(lightspot_mask(0.0, 0.0), ls_photocurrent_1uA)
-
-# Photocurrent should be 1uA.
 N = 5000
 t = 0.5e-3u"s"
-L_s5990 = 4.0e-3u"m"
-L_s5991 = 9.0e-3u"m"
+L_s5990 = SunSensors.size(s5990)
+L_s5991 = SunSensors.size(s5991)
+
+# Photocurrent should be 1uA.
+ls_photocurrent_1uA = RayAngles(0.0u"°", 0.0u"°", 75.0u"W/m^2")
+signal = OpticalSignal(lightspot_mask(0.0, 0.0), ls_photocurrent_1uA)
+readouts_s5990 = [(SunSensors.read(s5990, signal, t)) / t for _ in 1:N]
+readouts_s5991 = [(SunSensors.read(s5991, signal, t)) / t for _ in 1:N]
+photocurrent_s5990 = sum(sum.(readouts_s5990)) / N
+photocurrent_s5991 = sum(sum.(readouts_s5991)) / N
+println("Photocurrents used in datasheet measurements S5990 1 uA, S5991 1 uA")
+println("Photocurrents measured $photocurrent_s5990 $photocurrent_s5991")
 
 # Calculate expected resolution from datasheet information, by removing the circuit noise.
 circuit_input_noise = 1.0e-6u"V"
@@ -69,114 +76,126 @@ equivalent_input_current_noise_s5990 =
     sqrt(measurement_frequency)
 measured_position_resolution_s5990 = 0.7e-6u"m"
 measured_noise_s5990 =
-    measured_position_resolution_s5990 / L_s5990 * measurement_photocurrent
+    measured_position_resolution_s5990 / L_s5990[1] * measurement_photocurrent
 expected_noise_s5990 = sqrt(measured_noise_s5990^2 - equivalent_input_current_noise_s5990^2)
-resolution_s5990 = L_s5990 * expected_noise_s5990 / measurement_photocurrent
+resolution_s5990 = L_s5990[1] * expected_noise_s5990 / measurement_photocurrent
 
 equivalent_input_current_noise_s5991 =
     equivalent_input_voltage_noise / s5991.photodetector.resistance *
     sqrt(measurement_frequency)
 measured_position_resolution_s5991 = 1.5e-6u"m"
 measured_noise_s5991 =
-    measured_position_resolution_s5991 / L_s5991 * measurement_photocurrent
+    measured_position_resolution_s5991 / L_s5991[1] * measurement_photocurrent
 expected_noise_s5991 = sqrt(measured_noise_s5991^2 - equivalent_input_current_noise_s5991^2)
-resolution_s5991 = L_s5991 * expected_noise_s5991 / measurement_photocurrent
+resolution_s5991 = L_s5991[1] * expected_noise_s5991 / measurement_photocurrent
 println("Expected resolution S5990 $resolution_s5990 S5991 $resolution_s5991")
 
-readouts_s5990 = [(SunSensors.read(s5990, signal, t)) / t for _ in 1:N]
-readouts_s5991 = [(SunSensors.read(s5991, signal, t)) / t for _ in 1:N]
+function measure(x, y, sensor)
+    signal = OpticalSignal(lightspot_mask(x, y), ls_photocurrent_1uA)
+    out = SunSensors.read(sensor, signal, t)
+    pos = spot_position(out, sensor)
+    return pos
+end
 
-# Resolution is approximately the standard deviation.
-positions_s5990 = [get_pos(s, L_s5990) for s in readouts_s5990]
-mean_s5990 = sum.((first.(positions_s5990), last.(positions_s5990))) ./ N
-square_errors_s5990 = [(p .- mean_s5990) .^ 2 for p in positions_s5990]
-sd_s5990 = sqrt.([sum(first.(square_errors_s5990)), sum(last.(square_errors_s5990))] ./ N)
-println(
-    "S5990, mean ($(mean_s5990[1]), $(mean_s5990[2])) std ($(sd_s5990[1]), $(sd_s5990[2]))",
-)
+measure_s5990(x, y) = measure(x, y, s5990)
+measure_s5991(x, y) = measure(x, y, s5991)
 
-positions_s5991 = [get_pos(s, L_s5991) for s in readouts_s5991]
-mean_s5991 = sum.((first.(positions_s5991), last.(positions_s5991))) ./ N
-square_errors_s5991 = [(p .- mean_s5991) .^ 2 for p in positions_s5991]
-sd_s5991 = sqrt.([sum(first.(square_errors_s5991)), sum(last.(square_errors_s5991))] ./ N)
-println(
-    "S5991, mean ($(mean_s5991[1]), $(mean_s5991[2])) std ($(sd_s5991[1]), $(sd_s5991[2]))",
-)
+steps = 20
+samples = 20
 
-photocurrent_s5990 = sum(sum.(readouts_s5990)) / N
-photocurrent_s5991 = sum(sum.(readouts_s5991)) / N
-println("Photocurrents used in datasheet measurements S5990 1 uA, S5991 1 uA")
-println("Photocurrents measured $photocurrent_s5990 $photocurrent_s5991")
+positions_s5990 = []
+accuracies_s5990 = []
+precisions_s5990 = []
+positions_s5991 = []
+accuracies_s5991 = []
+precisions_s5991 = []
 
-## Position detection error
-readouts_s5990 = []
-readouts_s5991 = []
-steps = 100
-ls = RayAngles(0.0u"°", 0.0u"°")
-for step_x in 1:steps
-    for step_y in 1:steps
-        # Within 80% of the sensing surface.
-        k_x = (-0.5 + step_x / steps) * 0.8
-        k_y = (-0.5 + step_y / steps) * 0.8
-
-        x_s5990 = k_x * L_s5990
-        y_s5990 = k_y * L_s5990
-        s_s5990 =
-            SunSensors.read(
-                s5990,
-                OpticalSignal(lightspot_mask(ustrip(x_s5990), ustrip(y_s5990)), ls),
-                t,
-            ) / t
-        push!(readouts_s5990, ((x_s5990, y_s5990), get_pos(s_s5990, L_s5990)))
-
-        x_s5991 = k_x * L_s5991
-        y_s5991 = k_y * L_s5991
-        s_s5991 =
-            SunSensors.read(
-                s5991,
-                OpticalSignal(lightspot_mask(ustrip(x_s5991), ustrip(y_s5991)), ls),
-                t,
-            ) / t
-        push!(readouts_s5991, ((x_s5991, y_s5991), get_pos(s_s5991, L_s5991)))
+for i in 0:(steps - 1)
+    for j in 0:(steps - 1)
+        pos_x = (-0.5 + i / (steps - 1)) * ustrip(L_s5990[1]) * 0.9
+        pos_y = (-0.5 + j / (steps - 1)) * ustrip(L_s5990[2]) * 0.9
+        a, p = measure_accuracy_precision(measure_s5990, (pos_x, pos_y), 0.05e-3, samples)
+        push!(positions_s5990, (pos_x, pos_y))
+        push!(accuracies_s5990, a)
+        push!(precisions_s5990, p)
+        pos_x = (-0.5 + i / (steps - 1)) * ustrip(L_s5991[1]) * 0.9
+        pos_y = (-0.5 + j / (steps - 1)) * ustrip(L_s5991[2]) * 0.9
+        a, p = measure_accuracy_precision(measure_s5991, (pos_x, pos_y), 0.05e-3, samples)
+        push!(positions_s5991, (pos_x, pos_y))
+        push!(accuracies_s5991, a)
+        push!(precisions_s5991, p)
     end
 end
 
-error_displacements_s5990 = []
-for r in readouts_s5990
-    e = r[2] .- r[1]
-    push!(error_displacements_s5990, e)
-end
-
-errors_s5990 = [sqrt(e[1]^2 + e[2]^2) for e in error_displacements_s5990]
-
-max_error_s5990 = uconvert(u"μm", maximum(errors_s5990))
-typical_error_s5990 = uconvert(u"μm", sum(errors_s5990) / length(errors_s5990))
 println(
     "Maximum and typical position detection errors in datasheet for S5990 150 μm and 70 μm"
 )
 println(
-    "Maximum and typical position detection errors measured $max_error_s5990 $typical_error_s5990)",
-)
-n = Int(sqrt(length(errors_s5990)))
-h1 = heatmap(reshape(errors_s5990, n, n))
-
-error_displacements_s5991 = []
-for r in readouts_s5991
-    e = r[2] .- r[1]
-    push!(error_displacements_s5991, e)
-end
-
-errors_s5991 = [sqrt(e[1]^2 + e[2]^2) for e in error_displacements_s5991]
-
-max_error_s5991 = uconvert(u"μm", maximum(errors_s5991))
-typical_error_s5991 = uconvert(u"μm", sum(errors_s5991) / length(errors_s5991))
-println(
     "Maximum and typical position detection errors in datasheet for S5991 250 μm and 150 μm"
 )
-println(
-    "Maximum and typical position detection errors $max_error_s5991 $typical_error_s5991)"
-)
-n = Int(sqrt(length(errors_s5991)))
-h2 = heatmap(reshape(errors_s5991, n, n))
 
-plot(h1, h2)
+avg_precision_s5990 = mean(precisions_s5990)
+avg_precision_s5991 = mean(precisions_s5991)
+println(
+    "Average measured resolutions S5990 $avg_precision_s5990 S5991 $avg_precision_s5991"
+)
+avg_accuracy_s5990 = sqrt(
+    sum(mean.([first.(accuracies_s5990), last.(accuracies_s5990)]) .^ 2)
+)
+avg_accuracy_s5991 = sqrt(
+    sum(mean.([first.(accuracies_s5991), last.(accuracies_s5991)]) .^ 2)
+)
+println(
+    "Average measured detection errors S5990 $avg_accuracy_s5990 S5991 $avg_accuracy_s5991"
+)
+t_accuracy_s5990 = sqrt.(sum(avg_accuracy_s5990 .^ 2))
+t_accuracy_s5991 = sqrt.(sum(avg_accuracy_s5991 .^ 2))
+println(
+    "Average measured total detection errors S5990 $t_accuracy_s5990 S5991 $t_accuracy_s5991",
+)
+
+pos_s5990 = [(-0.5 + i / (steps - 1)) * ustrip(L_s5990[1]) * 0.9 for i in 0:(steps - 1)]
+pos_s5991 = [(-0.5 + i / (steps - 1)) * ustrip(L_s5991[1]) * 0.9 for i in 0:(steps - 1)]
+output_dir = "data/output/test/"
+heatmap(
+    pos_s5990,
+    pos_s5990,
+    reshape(precisions_s5990 .* 1e6, steps, steps);
+    label="S5990 resolution",
+    xlabel="position [m]",
+    ylabel="position [m]",
+    colorbar_title="precision [μm]",
+)
+savefig(output_dir * "s5990_precision.svg")
+heatmap(
+    pos_s5991,
+    pos_s5991,
+    reshape(precisions_s5991 * 1e6, steps, steps);
+    label="S5991 resolution",
+    xlabel="position [m]",
+    ylabel="position [m]",
+    colorbar_title="precision [μm]",
+)
+savefig(output_dir * "s5991_precision.svg")
+heatmap(
+    pos_s5990,
+    pos_s5990,
+    reshape(sqrt.(sum.(broadcast(x -> x .^ 2, accuracies_s5990))) * 1e6, steps, steps);
+    label="S5990 position detection error",
+    xlabel="position [m]",
+    ylabel="position [m]",
+    colorbar_title="accuracy [μm]",
+)
+savefig(output_dir * "s5990_accuracy.svg")
+heatmap(
+    pos_s5991,
+    pos_s5991,
+    reshape(sqrt.(sum.(broadcast(x -> x .^ 2, accuracies_s5991))) * 1e6, steps, steps);
+    label="S5991 position detection error",
+    xlabel="position [m]",
+    ylabel="position [m]",
+    colorbar_title="accuracy [μm]",
+)
+savefig(output_dir * "s5991_accuracy.svg")
+
+println("Accuracy and precision plots for S5990 and S5991 models saved in $output_dir")
