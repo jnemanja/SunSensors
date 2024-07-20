@@ -1,3 +1,17 @@
+include("psd.jl")
+include("profile.jl")
+
+"""
+    get_angles(point, positioned_mask)
+
+Calculates the angles of the incident light on the sun sensor from the light spot position given
+a positioned mask.
+"""
+function get_angles(projection_shift::Point, pmask::PositionedMask)
+    p = ustrip.(to(projection_shift))
+    return rad2deg.(atan.(p / ustrip(pmask.shift[3])))
+end
+
 """
     measure_accuracy_precision(f, point, area_size, samples)
 

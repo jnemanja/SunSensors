@@ -21,13 +21,6 @@ function lightspot_mask(x, y)
     )
 end
 
-function get_pos(signal, L)
-    s = ustrip.(signal)
-    x = ((s[2] + s[3]) - (s[1] + s[4])) / (2 * sum(s)) * L
-    y = ((s[1] + s[2]) - (s[3] + s[4])) / (2 * sum(s)) * L
-    return (x, y)
-end
-
 ## Dark current
 currents_s5990 = []
 currents_s5991 = []

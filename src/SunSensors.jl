@@ -63,6 +63,10 @@ export size
 
 include("determination/utils.jl")
 
+export SpatialMoment
+export QuadraticFitting
+export spot_position
+export get_angles
 export measure_accuracy_precision
 
 end
