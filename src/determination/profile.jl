@@ -56,8 +56,10 @@ function spot_position(
     shift = []
     for axis in 1:2
         k = findmax(signal[:, axis])[2]
-        if k < N + 1
-            k = N + 1
+        if k - N < 1
+            k = 1 + N
+        elseif k + N > sensor.resolution[axis]
+            k = sensor.resolution[axis] - N
         end
         y = signal[:, axis][(k - N):(k + N)]
 
