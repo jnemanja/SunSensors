@@ -180,7 +180,7 @@ function ProfileSensor(resolution::Tuple{Number,Number}, horizontal_pixel::Photo
         vertical_pixel = IdealPhotodetector(
             Rotate(pi / 2)(horizontal_pixel.geometry),
             horizontal_pixel.responsivity,
-            horizontal_pixel.dark_power,
+            horizontal_pixel.dark_power_density,
         )
     elseif typeof(horizontal_pixel) <: NoisyPhotodetector
         vertical_pixel = NoisyPhotodetector(
