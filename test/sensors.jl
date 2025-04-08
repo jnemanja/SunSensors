@@ -3,7 +3,6 @@ using Plots
 import Meshes.atol
 
 # Improve precision. Some area miscalculations noticed at the default tolerance.
-atol(::Type{Float64}) =  1.0e-12
 
 pinhole_mask = BasicMask(
     [

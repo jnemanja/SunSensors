@@ -7,61 +7,9 @@ include("../scripts/foresail1_profile_based_sunsensor.jl")
 
 output_dir = "data/output/test/"
 
-## Patch up Meshes library functions.
-
-# Needed to avoid intersection algorithm generating self intersecting polygons.
-import Meshes.atol
-Meshes.atol(::Type{Float64}) = 1e-13
-
-# With increased precision, overlapping line intersections start appearing,
-# breaking the SutherlandHodgman method.
-import Meshes.clip
-function clip(ring::Ring{Dim}, other::Ring{Dim}, ::SutherlandHodgman) where {Dim}
-    # make sure other ring is CCW
-    occw = orientation(other) == CCW ? other : reverse(other)
-
-    r = vertices(ring)
-    o = vertices(occw)
-
-    for i in 1:length(o)
-        lₒ = Line(o[i], o[i + 1])
-
-        n = length(r)
-
-        u = Vector{eltype(r)}()
-        for j in 1:n
-            r₁ = r[j]
-            r₂ = r[mod1(j + 1, n)]
-            lᵣ = Line(r₁, r₂)
-
-            isinside₁ = (sideof(r₁, lₒ) != RIGHT)
-            isinside₂ = (sideof(r₂, lₒ) != RIGHT)
-
-            if isinside₁ && isinside₂
-                push!(u, r₁)
-            else
-                intr = intersection(lᵣ, lₒ)
-                if type(intr) == Crossing
-                    if isinside₁ && !isinside₂
-                        push!(u, r₁)
-                        push!(u, get(intr))
-                    elseif !isinside₁ && isinside₂
-                        push!(u, get(intr))
-                    end
-                elseif type(intr) == Overlapping
-                    push!(u, r₁)
-                end
-            end
-        end
-
-        r = u
-    end
-
-    return isempty(r) ? nothing : Ring(unique(r))
-end
 
 ## PSD based, sweep and stationary reading plots
-steps = 1000
+steps = 100
 
 angles_sweep = []
 measured_angles_sweep = []
@@ -146,7 +94,7 @@ savefig(output_dir * "foresail1_psd_based_sunsensor_precision.svg")
 println("Accuracy and precision plots of the PSD based sunsensor model saved in $output_dir")
 
 ## Profile based, sweep and stationary reading plots
-steps = 1000
+steps = 100
 
 angles_sweep = []
 measured_angles_sweep = []
@@ -181,11 +129,11 @@ savefig("data/output/test/foresail1_profile_based_sunsensor_x_sweep.svg")
 plot(first.(measured_angles_stationary); xlabel="sample", ylabel="measured angle (°)")
 savefig("data/output/test/foresail1_profile_based_sunsensor_x_stationary.svg")
 
-outs_sweep_x = reshape(vcat([o[:, 1] for o in outs_sweep]...), 256, 1000)
+outs_sweep_x = reshape(vcat([o[:, 1] for o in outs_sweep]...), 256, steps)
 heatmap(outs_sweep_x; xlabel="sample", ylabel="pixel readings")
 savefig("data/output/test/foresail1_profile_based_sunsensor_x_sweep_raw.svg")
 
-outs_stationary_x = reshape(vcat([o[:, 1] for o in outs_stationary]...), 256, 1000)
+outs_stationary_x = reshape(vcat([o[:, 1] for o in outs_stationary]...), 256, steps)
 heatmap(outs_stationary_x; xlabel="sample", ylabel="pixel readings")
 savefig("data/output/test/foresail1_profile_based_sunsensor_x_stationary_raw.svg")
 
