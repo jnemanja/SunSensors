@@ -31,7 +31,6 @@ p = NoisyPhotodetector(
     ((2.0e-3 / 256)u"m", (2.0e-3 / 256)u"m"),
     0.5u"A/W",
     5.0e2u"W/m^2",
-    15.0e3u"Hz",
     300.0u"K",
     250.0u"Ω",
 )
@@ -49,7 +48,6 @@ pp = NoisyPhotodetector(
     (2.0e-3u"m" / 256, 2.0e-3u"m"),
     0.5u"A/W",
     1.0e1u"W/m^2",
-    15.0e2u"Hz",
     300.0u"K",
     20.0u"Ω",
 )
@@ -70,7 +68,6 @@ psd = PsdSensor(
         (2.0e-3u"m", 2.0e-3u"m"),
         0.6u"A/W",
         1.0e-11u"W/m^2",
-        4.0e3u"Hz",
         300.0u"K",
         50.0u"Ω",
     ),
@@ -86,5 +83,5 @@ adc_psd = ADConverter(1e10u"V/C", 0.0005u"V", 16, 0.1)
 
 out1 = SunSensors.read(psd, os, 0.00002u"s")
 println(out1)
-out2 = adc_psd(out1)
+out2 = adc_psd(uconvert.(u"C", out1))
 println(out2)
